@@ -1,0 +1,2364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AETHER-SR // Deep Neural Image Restoration Engine</title>
+    
+    <!-- Premium Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-base: #05070f;
+            --bg-surface: rgba(13, 20, 38, 0.6);
+            --bg-card: rgba(20, 30, 55, 0.45);
+            --border-glow: rgba(0, 242, 254, 0.15);
+            --accent-primary: #00f2fe;
+            --accent-secondary: #4facfe;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --text-glow: rgba(0, 242, 254, 0.6);
+            --panel-width: 420px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 242, 254, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(79, 172, 254, 0.03) 0%, transparent 40%);
+        }
+
+        /* Top Bar */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: rgba(5, 7, 15, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            border-radius: 8px;
+            box-shadow: 0 0 15px var(--text-glow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .logo-icon::before {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 20%;
+            width: 60%;
+            height: 60%;
+            background: var(--bg-base);
+            transform: rotate(45deg);
+        }
+
+        .logo-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: linear-gradient(90deg, #fff 0%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-title span {
+            color: var(--accent-primary);
+            text-shadow: 0 0 10px var(--text-glow);
+            font-weight: 800;
+            -webkit-text-fill-color: initial;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #10b981;
+        }
+
+        .status-dot.processing {
+            background-color: #f59e0b;
+            box-shadow: 0 0 8px #f59e0b;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        /* Main Workspace Container */
+        .workspace {
+            display: flex;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Interactive Viewport Area (Left) */
+        .viewport-container {
+            flex: 1;
+            position: relative;
+            background-color: #020306;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .viewport-toolbar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+            background: var(--bg-surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 6px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .vp-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .vp-btn:hover {
+            color: var(--accent-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .vp-btn.active {
+            color: var(--bg-base);
+            background: var(--accent-primary);
+            box-shadow: 0 0 10px var(--text-glow);
+        }
+
+        .zoom-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .viewport-canvas-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        .viewport-canvas-container:active {
+            cursor: grabbing;
+        }
+
+        #viewportCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Drag & Drop Overlay / Initial State */
+        .dropzone-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(5, 7, 15, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            transition: opacity 0.3s ease;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .dropzone-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .dropzone-box {
+            max-width: 480px;
+            border: 2px dashed rgba(0, 242, 254, 0.3);
+            background: rgba(13, 20, 38, 0.4);
+            padding: 48px 32px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .dropzone-box:hover, .dropzone-box.dragover {
+            border-color: var(--accent-primary);
+            background: rgba(0, 242, 254, 0.05);
+            box-shadow: 0 0 30px rgba(0, 242, 254, 0.1);
+        }
+
+        .dropzone-icon {
+            font-size: 3rem;
+            color: var(--accent-primary);
+            text-shadow: 0 0 15px var(--text-glow);
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .dropzone-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .dropzone-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        /* Sidebar Control Panel (Right) */
+        aside {
+            width: var(--panel-width);
+            background: rgba(5, 7, 15, 0.9);
+            backdrop-filter: blur(16px);
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 16px 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-primary);
+            text-shadow: 0 0 8px var(--text-glow);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 10%;
+            width: 80%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            box-shadow: 0 0 8px var(--accent-primary);
+        }
+
+        .tab-content-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .tab-pane {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .tab-pane.active {
+            display: flex;
+        }
+
+        /* Control Components */
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent-secondary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-group {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .control-row {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .control-val {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-primary);
+            font-size: 0.8rem;
+        }
+
+        /* Sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            box-shadow: 0 0 8px var(--accent-primary);
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Preset Resolution Grid */
+        .presets-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .preset-btn {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            padding: 10px 4px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .preset-btn:hover {
+            border-color: rgba(0, 242, 254, 0.4);
+            color: var(--text-main);
+        }
+
+        .preset-btn.active {
+            background: rgba(0, 242, 254, 0.08);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.1);
+        }
+
+        /* Process Button */
+        .action-btn {
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            border: none;
+            color: var(--bg-base);
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            padding: 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 242, 254, 0.25);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .action-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(0, 242, 254, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .action-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .action-btn:disabled {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* Weight Tuner Layout */
+        .tuner-filter-selector {
+            background: rgba(5, 7, 15, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 8px;
+            outline: none;
+            width: 100%;
+            font-size: 0.8rem;
+            font-family: 'Outfit', sans-serif;
+            margin-bottom: 12px;
+        }
+
+        .tuner-grid-container {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .kernel-grid {
+            display: grid;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .kernel-grid-5 {
+            grid-template-columns: repeat(5, 1fr);
+        }
+
+        .kernel-grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .kernel-input {
+            background: rgba(5, 7, 15, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--accent-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            text-align: center;
+            padding: 6px 2px;
+            border-radius: 4px;
+            width: 100%;
+            outline: none;
+        }
+
+        .kernel-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 5px rgba(0, 242, 254, 0.3);
+        }
+
+        .kernel-heatmap {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: #000;
+        }
+
+        /* System Terminal UI (Bottom) */
+        .terminal-panel {
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(2, 3, 6, 0.95);
+            height: 180px;
+            display: flex;
+            flex-direction: column;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .terminal-header {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .terminal-logs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 0.75rem;
+            scroll-behavior: smooth;
+        }
+
+        .log-entry {
+            line-height: 1.4;
+        }
+
+        .log-entry.info { color: #94a3b8; }
+        .log-entry.success { color: #10b981; }
+        .log-entry.warning { color: #f59e0b; }
+        .log-entry.error { color: #ef4444; font-weight: 500; }
+        .log-entry.sys { color: var(--accent-primary); }
+
+        .progress-bar-container {
+            height: 3px;
+            background: rgba(255, 255, 255, 0.05);
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            box-shadow: 0 0 8px var(--accent-primary);
+            transition: width 0.1s ease;
+        }
+
+        /* Utility classes */
+        .info-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .info-card strong {
+            color: var(--text-main);
+        }
+
+        /* Overlay loader during long operations */
+        .loader-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(5, 7, 15, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 40;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .loader-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(0, 242, 254, 0.1);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon"></div>
+            <div class="logo-title">AETHER-SR // <span>DEEP RECONSTRUCTION</span></div>
+        </div>
+        <div class="status-badge">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">GPU Engine Idle</span>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+        
+        <!-- Viewport Area (Left) -->
+        <div class="viewport-container">
+            <!-- Floating Viewport Controls -->
+            <div class="viewport-toolbar">
+                <button class="vp-btn" id="btnFit" title="Fit to Screen">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                </button>
+                <button class="vp-btn" id="btnZoomIn" title="Zoom In">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                </button>
+                <button class="vp-btn" id="btnZoomOut" title="Zoom Out">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="16.65" y2="11"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                </button>
+                <button class="vp-btn active" id="btnSplit" title="Toggle Split View">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                </button>
+                <div class="zoom-display" id="zoomDisplay">Zoom: 100%</div>
+            </div>
+
+            <!-- WebGL Interactive Viewport -->
+            <div class="viewport-canvas-container" id="viewportContainer">
+                <canvas id="viewportCanvas"></canvas>
+                <canvas id="overlayCanvas" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"></canvas>
+            </div>
+
+            <!-- Loader Overlay -->
+            <div class="loader-overlay" id="loaderOverlay">
+                <div class="spinner"></div>
+                <div style="font-weight: 500; font-size: 0.95rem;" id="loaderText">Initializing pipeline...</div>
+            </div>
+
+            <!-- Dropzone Overlay -->
+            <div class="dropzone-overlay" id="dropzone">
+                <div class="dropzone-box" id="dropzoneBox">
+                    <div class="dropzone-icon">▲</div>
+                    <div class="dropzone-title">Upload Source Image</div>
+                    <div class="dropzone-desc">Drag & drop your file here or click to browse.<br>Supports JPG, PNG, WebP up to 8K. Runs 100% locally.</div>
+                    <input type="file" id="fileInput" class="file-input" accept="image/*">
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Control Panel (Right) -->
+        <aside>
+            <!-- Navigation Tabs -->
+            <nav class="tabs-header">
+                <button class="tab-btn active" data-tab="tab-processing">RESTORE</button>
+                <button class="tab-btn" data-tab="tab-tuner">NEURAL TUNER</button>
+                <button class="tab-btn" data-tab="tab-about">INFO</button>
+            </nav>
+
+            <!-- Tabs Content -->
+            <div class="tab-content-container">
+                
+                <!-- Tab 1: Processing Controls -->
+                <div class="tab-pane active" id="tab-processing">
+                    
+                    <div class="control-row">
+                        <div class="section-title">Upscaling Target</div>
+                        <div class="presets-grid">
+                            <button class="preset-btn" data-preset="1080p">1080p<br><span style="font-size: 10px; opacity:0.6;">Standard</span></button>
+                            <button class="preset-btn active" data-preset="4k">4K UHD<br><span style="font-size: 10px; opacity:0.6;">Super-Res</span></button>
+                            <button class="preset-btn" data-preset="8k">8K Cinema<br><span style="font-size: 10px; opacity:0.6;">Tiled GPU</span></button>
+                        </div>
+                    </div>
+
+                    <div class="control-row">
+                        <div class="section-title">Pre-Processing Denoise</div>
+                        <div class="control-group">
+                            <div class="control-row">
+                                <div class="control-label">
+                                    <span>Bilateral Filtering</span>
+                                    <span class="control-val" id="valDenoise">0.40</span>
+                                </div>
+                                <input type="range" id="paramDenoise" min="0.0" max="1.0" step="0.05" value="0.40">
+                            </div>
+                            <div class="info-card" style="padding: 8px 12px; font-size: 0.75rem;">
+                                Denoises the source image *prior* to scaling to avoid magnifying compression artifacts and noise.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-row">
+                        <div class="section-title">SRCNN Parameters</div>
+                        <div class="control-group">
+                            <div class="control-row">
+                                <div class="control-label">
+                                    <span>Feature Detail Gain (α)</span>
+                                    <span class="control-val" id="valDetail">1.50</span>
+                                </div>
+                                <input type="range" id="paramDetail" min="0.0" max="3.0" step="0.05" value="1.50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-row">
+                        <div class="section-title">Adaptive Post-Sharpening</div>
+                        <div class="control-group">
+                            <div class="control-row">
+                                <div class="control-label">
+                                    <span>Sobel-Guided Edge Gain</span>
+                                    <span class="control-val" id="valSharpen">0.80</span>
+                                </div>
+                                <input type="range" id="paramSharpen" min="0.0" max="2.0" step="0.05" value="0.80">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trigger buttons -->
+                    <button class="action-btn" id="btnRestore" disabled>
+                        <span>RUN RESTORATION</span>
+                    </button>
+
+                    <button class="action-btn" id="btnDownload" disabled style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); color: #fff; box-shadow: none; margin-top: -8px;">
+                        <span>DOWNLOAD EXPORT</span>
+                    </button>
+
+                </div>
+
+                <!-- Tab 2: Neural Weight Tuner -->
+                <div class="tab-pane" id="tab-tuner">
+                    <div class="info-card">
+                        <strong>Neural Weight Tuner</strong>: Direct hardware register access. You are editing live WebGL uniform matrices used by the convolutional engine.
+                    </div>
+
+                    <div class="control-row">
+                        <div class="section-title">CNN Layer Selection</div>
+                        <select class="tuner-filter-selector" id="tunerLayerSelect">
+                            <option value="layer1_f0">Layer 1: Filter 0 (Horizontal Edge Extractor)</option>
+                            <option value="layer1_f1">Layer 1: Filter 1 (Vertical Edge Extractor)</option>
+                            <option value="layer1_f2">Layer 1: Filter 2 (Laplacian High-Frequency)</option>
+                            <option value="layer1_f3">Layer 1: Filter 3 (Diagonal Texture Ridge)</option>
+                            <option value="layer3_f0">Layer 3: Reconstruction Weight (Filter 0 Blend)</option>
+                            <option value="layer3_f1">Layer 3: Reconstruction Weight (Filter 1 Blend)</option>
+                            <option value="layer3_f2">Layer 3: Reconstruction Weight (Filter 2 Blend)</option>
+                            <option value="layer3_f3">Layer 3: Reconstruction Weight (Filter 3 Blend)</option>
+                        </select>
+                    </div>
+
+                    <div class="control-row">
+                        <div class="section-title">5x5 Convolution Kernel</div>
+                        <div class="control-group">
+                            <div class="tuner-grid-container">
+                                <div class="kernel-grid kernel-grid-5" id="tunerKernelGrid">
+                                    <!-- Inputs generated by JS -->
+                                </div>
+                                <canvas class="kernel-heatmap" id="tunerHeatmap" width="80" height="80"></canvas>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="preset-btn" id="btnResetKernel" style="flex:1; padding: 6px;">Reset Layer</button>
+                                <button class="preset-btn" id="btnNormalizeKernel" style="flex:1; padding: 6px;">Normalize</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-row" id="layer2TunerSection">
+                        <div class="section-title">Layer 2: 4x4 Coupling matrix</div>
+                        <div class="control-group" style="padding: 12px;">
+                            <div class="kernel-grid" style="grid-template-columns: repeat(4, 1fr); gap: 4px;" id="tunerLayer2Grid">
+                                <!-- Inputs generated by JS -->
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-align: center; margin-top: 4px;">
+                                Maps the extracted features to a non-linear activation map (1x1 conv mix).
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Help / Details -->
+                <div class="tab-pane" id="tab-about">
+                    <div class="control-row">
+                        <div class="section-title">Algorithm Pipeline</div>
+                        <div class="info-card" style="display: flex; flex-direction: column; gap: 10px; font-size: 0.8rem;">
+                            <p><strong>1. Color Space Shift</strong>: The RGB image is converted to YCbCr. This isolates details on the Y (Luminance) channel. Humans are highly sensitive to Y details, so the SRCNN network runs solely on Y, while CbCr are bilinearly upsampled.</p>
+                            <p><strong>2. Bilateral Denoising</strong>: A bilateral filter smooths out flat surfaces, suppressing sensor noise and JPEG artifacts without destroying crucial edges.</p>
+                            <p><strong>3. Feature Extraction (Layer 1)</strong>: Convolves the upscaled Y image with 4 distinct 5x5 filters. Each filter extracts a specific class of high-frequency feature (horizontal edges, vertical edges, local curvature, ridge textures) using a PReLU activation.</p>
+                            <p><strong>4. Non-Linear Mapping (Layer 2)</strong>: Interconnects the 4 feature maps spatially (3x3 neighborhood) and cross-channel via a coupling matrix, creating abstract patterns.</p>
+                            <p><strong>5. Reconstruction & Sharpening (Layer 3)</strong>: A 5x5 convolution recombines the mapping grids to generate a high-frequency residual detail map. This is blended back to the bicubic upscaled luminance. Finally, adaptive unsharp masking guided by Sobel edge detection sharpens boundaries while suppressing noise amplification.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- System Terminal Panel (Bottom of Sidebar) -->
+            <div class="terminal-panel">
+                <div class="terminal-header">
+                    <span>SYSTEM CORE INFERENCE LOGS</span>
+                    <span id="terminalClear" style="cursor: pointer; text-decoration: underline;">CLEAR</span>
+                </div>
+                <div class="terminal-logs" id="terminalLogs">
+                    <!-- Logs inserted dynamically -->
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- WebGL Processing and App logic scripts -->
+    <script>
+        // Global variables & state
+        const state = {
+            image: null,
+            imageWidth: 0,
+            imageHeight: 0,
+            targetPreset: '4k',
+            denoiseStrength: 0.40,
+            detailStrength: 1.50,
+            sharpenStrength: 0.80,
+            zoom: 1.0,
+            panX: 0.0,
+            panY: 0.0,
+            sliderX: 0.5,
+            isDraggingSlider: false,
+            isPanning: false,
+            startX: 0,
+            startY: 0,
+            weights: null,
+            isRestoring: false,
+            restoredCanvas: null,
+            restoredCtx: null,
+            viewportGl: null,
+            viewportProgram: null,
+            viewportTextures: { orig: null, restored: null },
+            glProc: null, // processing WebGL context (offscreen)
+            procPrograms: {},
+            procFbos: {},
+            procTextures: {},
+            activeTab: 'tab-processing',
+            tunerSelectedLayer: 'layer1_f0',
+        };
+
+        // Standard Vertex Shader Source (same for all passes)
+        const vsSource = `#version 300 es
+        in vec2 a_position;
+        in vec2 a_texCoord;
+        out vec2 v_texCoord;
+        void main() {
+            v_texCoord = a_texCoord;
+            gl_Position = vec4(a_position, 0.0, 1.0);
+        }`;
+
+        // Viewport Fragment Shader (Handles aspect ratio, zoom, pan, split slider, checkerboard)
+        const viewportFsSource = `#version 300 es
+        precision highp float;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        uniform sampler2D u_tex_orig;
+        uniform sampler2D u_tex_restored;
+        uniform float u_slider_x;
+        uniform float u_zoom;
+        uniform vec2 u_offset;
+        uniform float u_aspect_viewport;
+        uniform float u_aspect_image;
+        uniform int u_has_restored;
+
+        void main() {
+            // Center the UVs at (0.5, 0.5) to zoom about the center
+            vec2 uv = v_texCoord - 0.5;
+            
+            // Correct for viewport/image aspect ratio mismatch
+            float aspect = u_aspect_viewport / u_aspect_image;
+            if (aspect > 1.0) {
+                uv.x *= aspect;
+            } else {
+                uv.y /= aspect;
+            }
+            
+            // Apply zoom and panning offset
+            vec2 img_uv = uv / u_zoom + u_offset + 0.5;
+            
+            // Render checkerboard background if sampling out of bounds
+            if (img_uv.x < 0.0 || img_uv.x > 1.0 || img_uv.y < 0.0 || img_uv.y > 1.0) {
+                vec2 chess = floor(v_texCoord * 30.0);
+                float check = mod(chess.x + chess.y, 2.0);
+                vec3 bgColor = check > 0.5 ? vec3(0.06, 0.08, 0.12) : vec3(0.04, 0.05, 0.08);
+                fragColor = vec4(bgColor, 1.0);
+                return;
+            }
+            
+            // Sample both textures
+            vec4 col_orig = texture(u_tex_orig, img_uv);
+            vec4 col_restored = u_has_restored == 1 ? texture(u_tex_restored, img_uv) : col_orig;
+            
+            // Render split slider visual
+            float dist = abs(v_texCoord.x - u_slider_x);
+            if (u_has_restored == 1 && dist < 0.0015) {
+                fragColor = vec4(0.0, 0.95, 1.0, 1.0); // Neon cyan split line
+            } else if (u_has_restored == 1 && v_texCoord.x > u_slider_x) {
+                fragColor = col_restored;
+            } else {
+                fragColor = col_orig;
+            }
+        }`;
+
+        // Pass 1: Bilateral Denoising on low-res input (converts to YCbCr)
+        // Uses local tile UV: v_texCoord maps 0..1 over the tile patch texture.
+        const denoiseFsSource = `#version 300 es
+        precision highp float;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        uniform sampler2D u_texture;
+        uniform vec2 u_texelSize; // 1/patchW, 1/patchH
+        uniform float u_denoiseStrength;
+
+        const vec3 kY  = vec3(0.2126,  0.7152,  0.0722);
+        const vec3 kCb = vec3(-0.1146, -0.3854,  0.5000);
+        const vec3 kCr = vec3( 0.5000, -0.4542, -0.0458);
+
+        vec3 rgb2ycbcr(vec3 rgb) {
+            return vec3(dot(rgb, kY), dot(rgb, kCb) + 0.5, dot(rgb, kCr) + 0.5);
+        }
+
+        void main() {
+            vec2 uv = v_texCoord;
+            vec3 centerColor = texture(u_texture, uv).rgb;
+            if (u_denoiseStrength <= 0.01) {
+                fragColor = vec4(rgb2ycbcr(centerColor), 1.0);
+                return;
+            }
+            float spatialSigma2 = 8.0;
+            float rangeSigma2 = 2.0 * pow(0.12 * u_denoiseStrength + 0.01, 2.0);
+            vec3 sumColor = vec3(0.0);
+            float sumWeight = 0.0;
+            for (int y = -2; y <= 2; y++) {
+                for (int x = -2; x <= 2; x++) {
+                    vec2 offset = vec2(float(x), float(y)) * u_texelSize;
+                    vec3 color = texture(u_texture, uv + offset).rgb;
+                    float spatialDist2 = float(x*x + y*y);
+                    float rangeDist2 = dot(color - centerColor, color - centerColor);
+                    float weight = exp(-spatialDist2 / spatialSigma2) * exp(-rangeDist2 / rangeSigma2);
+                    sumColor += color * weight;
+                    sumWeight += weight;
+                }
+            }
+            fragColor = vec4(rgb2ycbcr(sumColor / (sumWeight + 1e-5)), 1.0);
+        }`;
+
+        // Pass 2: Catmull-Rom Bicubic Upsampler
+        // v_texCoord maps 0..1 over the low-res denoised patch; output fills the padded upscaled tile.
+        const bicubicFsSource = `#version 300 es
+        precision highp float;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        uniform sampler2D u_texture;
+        uniform vec2 u_texelSize; // 1/patchW, 1/patchH (low-res texel)
+
+        vec3 cubicInterp(vec3 v0, vec3 v1, vec3 v2, vec3 v3, float t) {
+            return v1 + 0.5 * t * (v2 - v0 + t * (2.0*v0 - 5.0*v1 + 4.0*v2 - v3 + t * (3.0*(v1-v2) + v3 - v0)));
+        }
+
+        vec3 bicubicSample(vec2 uv) {
+            vec2 pos = uv / u_texelSize - 0.5;
+            vec2 f = fract(pos);
+            vec2 i = floor(pos) + 0.5;
+            vec3 col[4];
+            for (int row = 0; row < 4; row++) {
+                vec3 r[4];
+                for (int col2 = 0; col2 < 4; col2++) {
+                    r[col2] = texture(u_texture, (i + vec2(float(col2-1), float(row-1))) * u_texelSize).rgb;
+                }
+                col[row] = cubicInterp(r[0], r[1], r[2], r[3], f.x);
+            }
+            return cubicInterp(col[0], col[1], col[2], col[3], f.y);
+        }
+
+        void main() {
+            // v_texCoord 0..1 maps over the padded upscaled tile.
+            // Sample the low-res texture with the same 0..1 coords.
+            fragColor = vec4(bicubicSample(v_texCoord), 1.0);
+        }`;
+
+        // Pass 3: SRCNN Layer 1 — 5x5 Feature Extraction
+        // v_texCoord maps 0..1 over the padded upscaled tile texture.
+        const srcnnL1FsSource = `#version 300 es
+        precision highp float;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        uniform sampler2D u_texture;
+        uniform vec2 u_texelSize; // 1/wUpscaled, 1/hUpscaled
+        uniform vec4 u_kernel1[25];
+        uniform vec4 u_bias1;
+
+        void main() {
+            vec2 uv = v_texCoord;
+            vec4 accum = vec4(0.0);
+            int idx = 0;
+            for (int y = -2; y <= 2; y++) {
+                for (int x = -2; x <= 2; x++) {
+                    float yVal = texture(u_texture, uv + vec2(float(x), float(y)) * u_texelSize).r;
+                    accum += yVal * u_kernel1[idx++];
+                }
+            }
+            vec4 pre = accum + u_bias1;
+            fragColor = mix(0.05 * pre, pre, step(0.0, pre));
+        }`;
+
+        // Pass 4: SRCNN Layer 2 — 3x3 Non-Linear Mapping
+        const srcnnL2FsSource = `#version 300 es
+        precision highp float;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        uniform sampler2D u_texture;
+        uniform vec2 u_texelSize;
+        uniform mat4 u_kernel2[9];
+        uniform vec4 u_bias2;
+
+        void main() {
+            vec2 uv = v_texCoord;
+            vec4 accum = vec4(0.0);
+            int idx = 0;
+            for (int y = -1; y <= 1; y++) {
+                for (int x = -1; x <= 1; x++) {
+                    accum += u_kernel2[idx++] * texture(u_texture, uv + vec2(float(x), float(y)) * u_texelSize);
+                }
+            }
+            vec4 pre = accum + u_bias2;
+            fragColor = mix(0.05 * pre, pre, step(0.0, pre));
+        }`;
+
+        // Pass 5: SRCNN Layer 3 — 5x5 Reconstruction
+        const srcnnL3FsSource = `#version 300 es
+        precision highp float;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        uniform sampler2D u_texture_features;
+        uniform sampler2D u_texture_base;
+        uniform vec2 u_texelSize;
+        uniform vec4 u_kernel3[25];
+        uniform float u_bias3;
+        uniform float u_detailStrength;
+
+        void main() {
+            vec2 uv = v_texCoord;
+            float residual = 0.0;
+            int idx = 0;
+            for (int y = -2; y <= 2; y++) {
+                for (int x = -2; x <= 2; x++) {
+                    residual += dot(texture(u_texture_features, uv + vec2(float(x), float(y)) * u_texelSize), u_kernel3[idx++]);
+                }
+            }
+            residual += u_bias3;
+            vec3 base = texture(u_texture_base, uv).rgb;
+            float finalY = clamp(base.r + residual * u_detailStrength, 0.0, 1.0);
+            fragColor = vec4(finalY, base.g, base.b, 1.0);
+        }`;
+
+        // Pass 6: Adaptive Sharpening + crop padding + YCbCr->RGB
+        // This is the ONLY pass that needs crop coordinates.
+        // gl_FragCoord.xy goes 0..wOut, 0..hOut (local to fboOut).
+        // We offset by u_cropOffset (= dxOut, dyOut) to index into the padded upscaled tile.
+        // No Y-flip here: gl.readPixels will read bottom-up, so we flip rows in JS.
+        const sharpenFsSource = `#version 300 es
+        precision highp float;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        uniform sampler2D u_texture;       // Reconstructed padded YCbCr
+        uniform vec2 u_texelSize;          // 1/wUpscaled, 1/hUpscaled
+        uniform float u_sharpenStrength;
+        uniform vec2 u_cropOffset;         // (dxOut, dyOut) in pixels inside padded tile
+        uniform vec2 u_paddedSize;         // (wUpscaled, hUpscaled)
+
+        vec3 ycbcr2rgb(vec3 c) {
+            float y = c.r, cb = c.g - 0.5, cr = c.b - 0.5;
+            return clamp(vec3(y + 1.5748*cr, y - 0.1873*cb - 0.4681*cr, y + 1.8556*cb), 0.0, 1.0);
+        }
+
+        void main() {
+            // Map output pixel to the correct location inside the padded upscaled tile.
+            // gl_FragCoord.xy is bottom-up (0 = bottom row), matching OpenGL convention.
+            // Rows are flipped in JS after readPixels, so here we just do the crop.
+            vec2 uv = (gl_FragCoord.xy + u_cropOffset) / u_paddedSize;
+
+            vec3 ycbcr = texture(u_texture, uv).rgb;
+            float centerLuma = ycbcr.r;
+
+            if (u_sharpenStrength <= 0.01) {
+                fragColor = vec4(ycbcr2rgb(ycbcr), 1.0);
+                return;
+            }
+
+            // Sobel edge gradient
+            float tl = texture(u_texture, uv + vec2(-1.0,  1.0)*u_texelSize).r;
+            float tc = texture(u_texture, uv + vec2( 0.0,  1.0)*u_texelSize).r;
+            float tr = texture(u_texture, uv + vec2( 1.0,  1.0)*u_texelSize).r;
+            float ml = texture(u_texture, uv + vec2(-1.0,  0.0)*u_texelSize).r;
+            float mr = texture(u_texture, uv + vec2( 1.0,  0.0)*u_texelSize).r;
+            float bl = texture(u_texture, uv + vec2(-1.0, -1.0)*u_texelSize).r;
+            float bc = texture(u_texture, uv + vec2( 0.0, -1.0)*u_texelSize).r;
+            float br = texture(u_texture, uv + vec2( 1.0, -1.0)*u_texelSize).r;
+
+            float gx = -tl + tr - 2.0*ml + 2.0*mr - bl + br;
+            float gy = -tl - 2.0*tc - tr + bl + 2.0*bc + br;
+            float edgeMask = clamp(sqrt(gx*gx + gy*gy) * 4.0, 0.0, 1.0);
+            float laplacian = tc + ml + mr + bc - 4.0 * centerLuma;
+            float sharpenedY = clamp(centerLuma - laplacian * u_sharpenStrength * edgeMask, 0.0, 1.0);
+
+            vec2 chromaUV = uv; // re-sample chroma at same coord
+            vec3 finalYCbCr = vec3(sharpenedY, texture(u_texture, chromaUV).g, texture(u_texture, chromaUV).b);
+            fragColor = vec4(ycbcr2rgb(finalYCbCr), 1.0);
+        }`;
+
+        // Initialize UI Elements on window load
+        window.addEventListener('DOMContentLoaded', () => {
+            initUI();
+            initViewportWebGL();
+            initProcessingWebGL();
+            log("Aether Engine online. Drop an image to begin.", "sys");
+        });
+
+        // Write console styled logs
+        function log(message, type = 'info') {
+            const logsContainer = document.getElementById('terminalLogs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString('pt-BR', { hour12: false });
+            entry.textContent = `[${timestamp}] ${message}`;
+            logsContainer.appendChild(entry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        // Initialize user interface hooks
+        function initUI() {
+            // Tabs navigation
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                    btn.classList.add('active');
+                    const pane = document.getElementById(btn.dataset.tab);
+                    pane.classList.add('active');
+                    state.activeTab = btn.dataset.tab;
+                    if (state.activeTab === 'tab-tuner') {
+                        populateTunerUI();
+                    }
+                });
+            });
+
+            // Sliders updates
+            const sliders = [
+                { sliderId: 'paramDenoise', valId: 'valDenoise', stateKey: 'denoiseStrength' },
+                { sliderId: 'paramDetail', valId: 'valDetail', stateKey: 'detailStrength' },
+                { sliderId: 'paramSharpen', valId: 'valSharpen', stateKey: 'sharpenStrength' }
+            ];
+            sliders.forEach(s => {
+                const el = document.getElementById(s.sliderId);
+                const valEl = document.getElementById(s.valId);
+                el.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    valEl.textContent = val.toFixed(2);
+                    state[s.stateKey] = val;
+                    triggerViewportRedraw();
+                });
+            });
+
+            // Preset resolutions selector
+            document.querySelectorAll('[data-preset]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('[data-preset]').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.targetPreset = btn.dataset.preset;
+                    log(`Target resolution changed to ${state.targetPreset.toUpperCase()}`, "info");
+                });
+            });
+
+            // Drag-and-drop actions
+            const dropzone = document.getElementById('dropzone');
+            const dropzoneBox = document.getElementById('dropzoneBox');
+            const fileInput = document.getElementById('fileInput');
+
+            dropzoneBox.addEventListener('click', () => fileInput.click());
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzoneBox.classList.add('dragover');
+            });
+            dropzone.addEventListener('dragleave', () => {
+                dropzoneBox.classList.remove('dragover');
+            });
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzoneBox.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    handleImageLoad(e.dataTransfer.files[0]);
+                }
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleImageLoad(e.target.files[0]);
+                }
+            });
+
+            // Restoration click
+            document.getElementById('btnRestore').addEventListener('click', () => {
+                runRestorationEngine();
+            });
+
+            // Export image click
+            document.getElementById('btnDownload').addEventListener('click', () => {
+                exportRestoredImage();
+            });
+
+            // Viewport buttons
+            document.getElementById('btnFit').addEventListener('click', resetViewportView);
+            document.getElementById('btnZoomIn').addEventListener('click', () => {
+                state.zoom = Math.min(10.0, state.zoom * 1.3);
+                triggerViewportRedraw();
+            });
+            document.getElementById('btnZoomOut').addEventListener('click', () => {
+                state.zoom = Math.max(0.1, state.zoom / 1.3);
+                triggerViewportRedraw();
+            });
+            
+            const btnSplit = document.getElementById('btnSplit');
+            btnSplit.addEventListener('click', () => {
+                btnSplit.classList.toggle('active');
+                triggerViewportRedraw();
+            });
+
+            // Interactive weights tuner events
+            document.getElementById('tunerLayerSelect').addEventListener('change', (e) => {
+                state.tunerSelectedLayer = e.target.value;
+                populateTunerUI();
+            });
+
+            document.getElementById('btnResetKernel').addEventListener('click', () => {
+                resetSelectedLayerWeights();
+            });
+
+            document.getElementById('btnNormalizeKernel').addEventListener('click', () => {
+                normalizeSelectedLayerWeights();
+            });
+
+            document.getElementById('terminalClear').addEventListener('click', () => {
+                document.getElementById('terminalLogs').innerHTML = '';
+            });
+
+            // Setup viewport canvas mouse events for Zoom and Pan
+            const container = document.getElementById('viewportContainer');
+            container.addEventListener('pointerdown', handlePointerDown);
+            window.addEventListener('pointermove', handlePointerMove);
+            window.addEventListener('pointerup', handlePointerUp);
+            container.addEventListener('wheel', handleWheel, { passive: false });
+
+            // Initialize default neural weights
+            state.weights = generateDefaultWeights();
+        }
+
+        // Pointer operations for Zoom/Pan and Slider adjustment
+        function handlePointerDown(e) {
+            if (!state.image) return;
+            const container = document.getElementById('viewportContainer');
+            const rect = container.getBoundingClientRect();
+            const xNorm = (e.clientX - rect.left) / rect.width;
+            
+            // Check if user clicked near the slider divider line (within 10 pixels range)
+            const isSplitActive = document.getElementById('btnSplit').classList.contains('active');
+            if (isSplitActive && Math.abs(xNorm - state.sliderX) < 0.02) {
+                state.isDraggingSlider = true;
+                container.style.cursor = 'ew-resize';
+            } else {
+                state.isPanning = true;
+                state.startX = e.clientX;
+                state.startY = e.clientY;
+                container.style.cursor = 'grabbing';
+            }
+            e.preventDefault();
+        }
+
+        function handlePointerMove(e) {
+            if (!state.image) return;
+            if (state.isDraggingSlider) {
+                const container = document.getElementById('viewportContainer');
+                const rect = container.getBoundingClientRect();
+                state.sliderX = Math.max(0.01, Math.min(0.99, (e.clientX - rect.left) / rect.width));
+                triggerViewportRedraw();
+            } else if (state.isPanning) {
+                const dx = e.clientX - state.startX;
+                const dy = e.clientY - state.startY;
+                
+                // Adjust translation based on zoom scale and viewport aspect ratios
+                const canvas = document.getElementById('viewportCanvas');
+                state.panX -= (dx / canvas.width) * (2.0 / state.zoom);
+                // Invert Y pan for WebGL coordinate space
+                state.panY += (dy / canvas.height) * (2.0 / state.zoom);
+                
+                state.startX = e.clientX;
+                state.startY = e.clientY;
+                triggerViewportRedraw();
+            }
+        }
+
+        function handlePointerUp() {
+            state.isDraggingSlider = false;
+            state.isPanning = false;
+            const container = document.getElementById('viewportContainer');
+            container.style.cursor = 'grab';
+        }
+
+        function handleWheel(e) {
+            if (!state.image) return;
+            e.preventDefault();
+            
+            const zoomFactor = 1.1;
+            if (e.deltaY < 0) {
+                state.zoom = Math.min(15.0, state.zoom * zoomFactor);
+            } else {
+                state.zoom = Math.max(0.1, state.zoom / zoomFactor);
+            }
+            triggerViewportRedraw();
+        }
+
+        function resetViewportView() {
+            state.zoom = 1.0;
+            state.panX = 0.0;
+            state.panY = 0.0;
+            state.sliderX = 0.5;
+            triggerViewportRedraw();
+        }
+
+        function triggerViewportRedraw() {
+            if (!state.image) return;
+            
+            const gl = state.viewportGl;
+            const program = state.viewportProgram;
+            
+            const canvas = document.getElementById('viewportCanvas');
+            const container = document.getElementById('viewportContainer');
+            
+            // Adjust canvas sizing to match CSS container
+            const dpr = window.devicePixelRatio || 1;
+            const targetWidth = Math.floor(container.clientWidth * dpr);
+            const targetHeight = Math.floor(container.clientHeight * dpr);
+            if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            }
+            
+            // Display current zoom formatted on Toolbar
+            document.getElementById('zoomDisplay').textContent = `Zoom: ${Math.round(state.zoom * 100)}%`;
+            
+            gl.useProgram(program);
+            
+            // Bind original texture (Slot 0)
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, state.viewportTextures.orig);
+            gl.uniform1i(gl.getUniformLocation(program, 'u_tex_orig'), 0);
+            
+            // Bind restored texture (Slot 1)
+            gl.activeTexture(gl.TEXTURE1);
+            let hasRestored = 0;
+            if (state.viewportTextures.restored) {
+                gl.bindTexture(gl.TEXTURE_2D, state.viewportTextures.restored);
+                hasRestored = 1;
+            } else {
+                // Fallback to original
+                gl.bindTexture(gl.TEXTURE_2D, state.viewportTextures.orig);
+            }
+            gl.uniform1i(gl.getUniformLocation(program, 'u_tex_restored'), 1);
+            gl.uniform1i(gl.getUniformLocation(program, 'u_has_restored'), hasRestored);
+            
+            // Pass slider and zoom constants
+            const isSplitActive = document.getElementById('btnSplit').classList.contains('active');
+            gl.uniform1f(gl.getUniformLocation(program, 'u_slider_x'), isSplitActive ? state.sliderX : 2.0);
+            gl.uniform1f(gl.getUniformLocation(program, 'u_zoom'), state.zoom);
+            gl.uniform2f(gl.getUniformLocation(program, 'u_offset'), state.panX, state.panY);
+            
+            gl.uniform1f(gl.getUniformLocation(program, 'u_aspect_viewport'), canvas.width / canvas.height);
+            gl.uniform1f(gl.getUniformLocation(program, 'u_aspect_image'), state.imageWidth / state.imageHeight);
+            
+            // Draw quad
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+
+        // Initialize WebGL2 for viewport display
+        function initViewportWebGL() {
+            const canvas = document.getElementById('viewportCanvas');
+            const gl = canvas.getContext('webgl2');
+            if (!gl) {
+                log("Fatal: Viewport WebGL2 context not available.", "error");
+                return;
+            }
+            state.viewportGl = gl;
+            
+            // Create full screen quad coordinates
+            const vertices = new Float32Array([
+                -1, -1,  0, 0,
+                 1, -1,  1, 0,
+                -1,  1,  0, 1,
+                 1,  1,  1, 1
+            ]);
+            
+            const buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+            
+            // Build Shader Program
+            try {
+                const vs = compileShader(gl, vsSource, gl.VERTEX_SHADER);
+                const fs = compileShader(gl, viewportFsSource, gl.FRAGMENT_SHADER);
+                const prog = gl.createProgram();
+                gl.attachShader(prog, vs);
+                gl.attachShader(prog, fs);
+                gl.linkProgram(prog);
+                if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+                    throw new Error(gl.getProgramInfoLog(prog));
+                }
+                state.viewportProgram = prog;
+                
+                gl.useProgram(prog);
+                const a_position = gl.getAttribLocation(prog, 'a_position');
+                gl.enableVertexAttribArray(a_position);
+                gl.vertexAttribPointer(a_position, 2, gl.FLOAT, false, 16, 0);
+                
+                const a_texCoord = gl.getAttribLocation(prog, 'a_texCoord');
+                gl.enableVertexAttribArray(a_texCoord);
+                gl.vertexAttribPointer(a_texCoord, 2, gl.FLOAT, false, 16, 8);
+                
+            } catch (err) {
+                log(`Shader Linking Error: ${err.message}`, "error");
+            }
+        }
+
+        // WebGL helper: compile shader
+        function compileShader(gl, source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                const logErr = gl.getShaderInfoLog(shader);
+                gl.deleteShader(shader);
+                throw new Error(`Shader compilation failed: ${logErr}`);
+            }
+            return shader;
+        }
+
+        // Programmatic Weight Generation on Startup
+        function generateDefaultWeights() {
+            const weights = {
+                layer1: new Float32Array(25 * 4), // 25 elements of vec4
+                bias1: new Float32Array([0.02, 0.02, 0.02, 0.02]),
+                layer2: new Float32Array(9 * 16),  // 9 elements of mat4
+                bias2: new Float32Array([0.02, 0.02, 0.02, 0.02]),
+                layer3: new Float32Array(25 * 4), // 25 elements of vec4
+                bias3: 0.0
+            };
+
+            const sigma = 1.0;
+            
+            // Build layer 1 5x5 kernels programmatically
+            for (let y = -2; y <= 2; y++) {
+                for (let x = -2; x <= 2; x++) {
+                    const g = Math.exp(-(x*x + y*y) / (2 * sigma * sigma));
+                    
+                    // Filter 0: Horizontal Edge (derivative of Gaussian in x)
+                    const f0 = -x * g;
+                    // Filter 1: Vertical Edge (derivative of Gaussian in y)
+                    const f1 = -y * g;
+                    // Filter 2: High Pass Laplacian
+                    const f2 = (x*x + y*y - 2 * sigma * sigma) * g;
+                    // Filter 3: Diagonal Ridge detector
+                    const f3 = (x*x - y*y) * g;
+                    
+                    const idx = ((y + 2) * 5 + (x + 2)) * 4;
+                    weights.layer1[idx] = f0;
+                    weights.layer1[idx+1] = f1;
+                    weights.layer1[idx+2] = f2;
+                    weights.layer1[idx+3] = f3;
+                }
+            }
+
+            // Normalize Layer 1 Filters
+            let sumL1 = [0,0,0,0];
+            for (let i = 0; i < 25; i++) {
+                sumL1[0] += Math.abs(weights.layer1[i*4]);
+                sumL1[1] += Math.abs(weights.layer1[i*4+1]);
+                sumL1[2] += Math.abs(weights.layer1[i*4+2]);
+                sumL1[3] += Math.abs(weights.layer1[i*4+3]);
+            }
+            for (let i = 0; i < 25; i++) {
+                weights.layer1[i*4]   /= (sumL1[0] || 1) * 0.4; // boost gradients slightly
+                weights.layer1[i*4+1] /= (sumL1[1] || 1) * 0.4;
+                weights.layer1[i*4+2] /= (sumL1[2] || 1) * 0.4;
+                weights.layer1[i*4+3] /= (sumL1[3] || 1) * 0.4;
+            }
+
+            // Build Layer 2: 3x3 mapping kernels (mixes 4 channels and passes context)
+            const identityMatrix = [
+                1.1, -0.2,  0.1,  0.0,
+               -0.2,  1.1,  0.1,  0.0,
+                0.0,  0.0,  1.4, -0.2,
+                0.1,  0.1, -0.2,  1.1
+            ];
+            const smoothMatrix = [
+                0.04, 0.0,  0.0,  0.0,
+                0.0,  0.04, 0.0,  0.0,
+                0.0,  0.0,  0.04, 0.0,
+                0.0,  0.0,  0.0,  0.04
+            ];
+
+            for (let y = -1; y <= 1; y++) {
+                for (let x = -1; x <= 1; x++) {
+                    const idx = ((y + 1) * 3 + (x + 1)) * 16;
+                    const matrixToUse = (x === 0 && y === 0) ? identityMatrix : smoothMatrix;
+                    for (let i = 0; i < 16; i++) {
+                        weights.layer2[idx + i] = matrixToUse[i];
+                    }
+                }
+            }
+
+            // Build Layer 3: 5x5 reconstruction kernel
+            for (let y = -2; y <= 2; y++) {
+                for (let x = -2; x <= 2; x++) {
+                    const g = Math.exp(-(x*x + y*y) / (2.0 * 1.3 * 1.3));
+                    const idx = ((y + 2) * 5 + (x + 2)) * 4;
+                    // Combine features to reconstruct luminance:
+                    // Filter 2 (high pass details) has positive gain. Gradients help reconstruct edges.
+                    weights.layer3[idx]   = 0.3 * g * (x > 0 ? 1 : -1);
+                    weights.layer3[idx+1] = 0.3 * g * (y > 0 ? 1 : -1);
+                    weights.layer3[idx+2] = 0.9 * g; // strong detail mapping
+                    weights.layer3[idx+3] = 0.4 * g; // texture addition
+                }
+            }
+
+            // Normalize Layer 3 filter
+            let sumL3 = [0,0,0,0];
+            for (let i = 0; i < 25; i++) {
+                sumL3[0] += Math.abs(weights.layer3[i*4]);
+                sumL3[1] += Math.abs(weights.layer3[i*4+1]);
+                sumL3[2] += Math.abs(weights.layer3[i*4+2]);
+                sumL3[3] += Math.abs(weights.layer3[i*4+3]);
+            }
+            for (let i = 0; i < 25; i++) {
+                weights.layer3[i*4]   /= (sumL3[0] || 1) * 1.3;
+                weights.layer3[i*4+1] /= (sumL3[1] || 1) * 1.3;
+                weights.layer3[i*4+2] /= (sumL3[2] || 1) * 1.3;
+                weights.layer3[i*4+3] /= (sumL3[3] || 1) * 1.3;
+            }
+
+            return weights;
+        }
+
+        // Image loader routine
+        function handleImageLoad(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.image = img;
+                    state.imageWidth = img.width;
+                    state.imageHeight = img.height;
+                    
+                    log(`Source image loaded: ${img.width}x${img.height}`, "success");
+                    
+                    // Upload to viewport texture
+                    uploadOriginalTexture(img);
+                    
+                    // Reset Viewport zoom/pan and enable buttons
+                    resetViewportView();
+                    document.getElementById('btnRestore').removeAttribute('disabled');
+                    document.getElementById('btnDownload').setAttribute('disabled', 'true');
+                    document.getElementById('dropzone').classList.add('hidden');
+                    
+                    // Remove old restored canvas/textures
+                    state.restoredCanvas = null;
+                    state.restoredCtx = null;
+                    if (state.viewportTextures.restored) {
+                        const gl = state.viewportGl;
+                        gl.deleteTexture(state.viewportTextures.restored);
+                        state.viewportTextures.restored = null;
+                    }
+                    
+                    triggerViewportRedraw();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function uploadOriginalTexture(img) {
+            const gl = state.viewportGl;
+            if (state.viewportTextures.orig) {
+                gl.deleteTexture(state.viewportTextures.orig);
+            }
+            
+            const tex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            
+            // Set unpack parameters to flip Y coordinate (right-side up in WebGL)
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            
+            state.viewportTextures.orig = tex;
+        }
+
+        // Initialize WebGL context for tiled computations
+        function initProcessingWebGL() {
+            const gl = state.viewportGl;
+            if (!gl) {
+                log("Error: Viewport WebGL2 context not available. Cannot initialize processing.", "error");
+                return;
+            }
+            state.glProc = gl;
+            
+            // Test capabilities for float textures
+            const floatExt = gl.getExtension('EXT_color_buffer_float');
+            if (!floatExt) {
+                log("Warning: EXT_color_buffer_float not supported. Processing in standard 8-bit precision.", "warning");
+            } else {
+                log("Hardware Floating-Point Textures enabled (Float32 Precision).", "success");
+            }
+
+            const maxTexSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+            log(`Hardware limit - Maximum texture size: ${maxTexSize}px.`, "info");
+            
+            // Compile processing shader programs
+            try {
+                state.procPrograms.denoise = createProcProgram(gl, vsSource, denoiseFsSource);
+                state.procPrograms.bicubic = createProcProgram(gl, vsSource, bicubicFsSource);
+                state.procPrograms.layer1 = createProcProgram(gl, vsSource, srcnnL1FsSource);
+                state.procPrograms.layer2 = createProcProgram(gl, vsSource, srcnnL2FsSource);
+                state.procPrograms.layer3 = createProcProgram(gl, vsSource, srcnnL3FsSource);
+                state.procPrograms.sharpen = createProcProgram(gl, vsSource, sharpenFsSource);
+                
+                // Initialize a shared quad geometry buffer
+                const vertices = new Float32Array([
+                    -1, -1,  0, 0,
+                     1, -1,  1, 0,
+                    -1,  1,  0, 1,
+                     1,  1,  1, 1
+                ]);
+                const buffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+                gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+                state.procQuadBuffer = buffer;
+                
+            } catch (err) {
+                log(`Shader Compilation Failed: ${err.message}`, "error");
+            }
+        }
+
+        function createProcProgram(gl, vsSrc, fsSrc) {
+            const vs = compileShader(gl, vsSrc, gl.VERTEX_SHADER);
+            const fs = compileShader(gl, fsSrc, gl.FRAGMENT_SHADER);
+            const prog = gl.createProgram();
+            gl.attachShader(prog, vs);
+            gl.attachShader(prog, fs);
+            gl.linkProgram(prog);
+            if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+                throw new Error(gl.getProgramInfoLog(prog));
+            }
+            return prog;
+        }
+
+        // Tiled Asynchronous Processing Engine
+        async function runRestorationEngine() {
+            if (!state.image || state.isRestoring) return;
+            
+            state.isRestoring = true;
+            document.getElementById('btnRestore').setAttribute('disabled', 'true');
+            document.getElementById('statusDot').className = 'status-dot processing';
+            document.getElementById('statusText').textContent = 'Processing SRCNN...';
+            
+            const loaderOverlay = document.getElementById('loaderOverlay');
+            const loaderText = document.getElementById('loaderText');
+            loaderOverlay.classList.add('active');
+            
+            // 1. Calculate Output Resolutions based on Preset
+            let outW = 1920;
+            let outH = 1080;
+            const aspect = state.imageWidth / state.imageHeight;
+            
+            if (state.targetPreset === '1080p') {
+                if (aspect > 1) {
+                    outW = 1920; outH = Math.round(1920 / aspect);
+                } else {
+                    outH = 1080; outW = Math.round(1080 * aspect);
+                }
+            } else if (state.targetPreset === '4k') {
+                if (aspect > 1) {
+                    outW = 3840; outH = Math.round(3840 / aspect);
+                } else {
+                    outH = 2160; outW = Math.round(2160 * aspect);
+                }
+            } else if (state.targetPreset === '8k') {
+                if (aspect > 1) {
+                    outW = 7680; outH = Math.round(7680 / aspect);
+                } else {
+                    outH = 4320; outW = Math.round(4320 * aspect);
+                }
+            }
+            
+            const scale = outW / state.imageWidth;
+            log(`Initializing Super-Resolution Pipeline...`, "sys");
+            log(`Source: ${state.imageWidth}x${state.imageHeight} | Output: ${outW}x${outH} (${scale.toFixed(2)}x scale)`, "info");
+            
+            // 2. Setup high-res destination canvas
+            const destCanvas = document.createElement('canvas');
+            destCanvas.width = outW;
+            destCanvas.height = outH;
+            const destCtx = destCanvas.getContext('2d');
+            state.restoredCanvas = destCanvas;
+            state.restoredCtx = destCtx;
+            
+            // 3. Grid Tiling setup
+            const tileSize = 512; // Output tile dimension
+            const paddingIn = 12; // Input padding margin to prevent convolution boundary seams
+            const paddingOut = Math.round(paddingIn * scale);
+            
+            const cols = Math.ceil(outW / tileSize);
+            const rows = Math.ceil(outH / tileSize);
+            const totalTiles = cols * rows;
+            
+            log(`Grid configured: ${cols}x${rows} tiles (size ${tileSize}x${tileSize}px, padding ±${paddingOut}px)`, "info");
+            
+            // Create target GPU textures on viewport canvas to display updates
+            const viewGl = state.viewportGl;
+            if (state.viewportTextures.restored) {
+                viewGl.deleteTexture(state.viewportTextures.restored);
+            }
+            const restoredTex = viewGl.createTexture();
+            viewGl.bindTexture(viewGl.TEXTURE_2D, restoredTex);
+            // UNPACK_FLIP_Y must be false: tiles are already top-down after JS row-flip in executeWebGLPipeline.
+            viewGl.pixelStorei(viewGl.UNPACK_FLIP_Y_WEBGL, false);
+            viewGl.texImage2D(viewGl.TEXTURE_2D, 0, viewGl.RGBA, outW, outH, 0, viewGl.RGBA, viewGl.UNSIGNED_BYTE, null);
+            viewGl.texParameteri(viewGl.TEXTURE_2D, viewGl.TEXTURE_MIN_FILTER, viewGl.LINEAR);
+            viewGl.texParameteri(viewGl.TEXTURE_2D, viewGl.TEXTURE_MAG_FILTER, viewGl.LINEAR);
+            viewGl.texParameteri(viewGl.TEXTURE_2D, viewGl.TEXTURE_WRAP_S, viewGl.CLAMP_TO_EDGE);
+            viewGl.texParameteri(viewGl.TEXTURE_2D, viewGl.TEXTURE_WRAP_T, viewGl.CLAMP_TO_EDGE);
+            state.viewportTextures.restored = restoredTex;
+            
+            // Temporary Canvas for extracting input crop
+            const cropCanvas = document.createElement('canvas');
+            const cropCtx = cropCanvas.getContext('2d');
+            
+            const gl = state.glProc;
+            const isFloatSupported = gl.getExtension('EXT_color_buffer_float') !== null;
+            const floatType = gl.HALF_FLOAT; // Use Half Float for stability and speed
+            const floatInternalFmt = isFloatSupported ? gl.RGBA16F : gl.RGBA8;
+            const floatDataFmt = isFloatSupported ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+            
+            let tilesProcessed = 0;
+            const startTime = performance.now();
+            
+            // Tile processing queue
+            const tiles = [];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    tiles.push({ r, c });
+                }
+            }
+            
+            // Adaptive loop runner (processes tiles using requestAnimationFrame)
+            const processNextBatch = () => {
+                const frameStartTime = performance.now();
+                const frameBudget = 14; // Max ms per frame to stay within 60fps
+                
+                while (tiles.length > 0 && (performance.now() - frameStartTime) < frameBudget) {
+                    const tile = tiles.shift();
+                    const { r, c } = tile;
+                    
+                    // Output coordinates
+                    const xOut = c * tileSize;
+                    const yOut = r * tileSize;
+                    const wOut = Math.min(tileSize, outW - xOut);
+                    const hOut = Math.min(tileSize, outH - yOut);
+                    
+                    // Input coordinates corresponding to output coordinates
+                    const xIn = xOut / scale;
+                    const yIn = yOut / scale;
+                    const wIn = wOut / scale;
+                    const hIn = hOut / scale;
+                    
+                    // Apply crop margins (clamped inside image boundaries)
+                    const xInPadded = Math.max(0, Math.floor(xIn - paddingIn));
+                    const yInPadded = Math.max(0, Math.floor(yIn - paddingIn));
+                    const xInMax = Math.min(state.imageWidth, Math.ceil(xIn + wIn + paddingIn));
+                    const yInMax = Math.min(state.imageHeight, Math.ceil(yIn + hIn + paddingIn));
+                    
+                    const wInCrop = xInMax - xInPadded;
+                    const hInCrop = yInMax - yInPadded;
+                    
+                    // Dimension of the upscaled padded region
+                    const wUpscaled = Math.round(wInCrop * scale);
+                    const hUpscaled = Math.round(hInCrop * scale);
+                    
+                    // Offset of output center relative to padded input
+                    const dxOut = Math.round((xIn - xInPadded) * scale);
+                    const dyOut = Math.round((yIn - yInPadded) * scale);
+                    
+                    // Extract input patch
+                    cropCanvas.width = wInCrop;
+                    cropCanvas.height = hInCrop;
+                    cropCtx.drawImage(state.image, xInPadded, yInPadded, wInCrop, hInCrop, 0, 0, wInCrop, hInCrop);
+                    
+                    // Run the WebGL Pipeline on this tile
+                    const pixelData = executeWebGLPipeline(gl, cropCanvas, wUpscaled, hUpscaled, wOut, hOut, dxOut, dyOut, floatInternalFmt, floatDataFmt);
+                    
+                    // Write back to high-res canvas
+                    const imgData = new ImageData(new Uint8ClampedArray(pixelData), wOut, hOut);
+                    destCtx.putImageData(imgData, xOut, yOut);
+                    
+                    // Push tile to viewport GPU texture for live progress display.
+                    // Pixels are top-down (row-flipped in executeWebGLPipeline), and
+                    // UNPACK_FLIP_Y is false, so xOut/yOut directly place the tile correctly.
+                    viewGl.bindTexture(viewGl.TEXTURE_2D, restoredTex);
+                    viewGl.pixelStorei(viewGl.UNPACK_FLIP_Y_WEBGL, false);
+                    viewGl.texSubImage2D(viewGl.TEXTURE_2D, 0, xOut, yOut, wOut, hOut, viewGl.RGBA, viewGl.UNSIGNED_BYTE, imgData.data);
+                    
+                    tilesProcessed++;
+                    
+                    // Update progress display
+                    const progressPercent = Math.round((tilesProcessed / totalTiles) * 100);
+                    document.getElementById('progressBarFill').style.width = `${progressPercent}%`;
+                    loaderText.textContent = `Processing SRCNN: ${tilesProcessed}/${totalTiles} tiles (${progressPercent}%)`;
+                    
+                    triggerViewportRedraw();
+                }
+                
+                if (tiles.length > 0) {
+                    requestAnimationFrame(processNextBatch);
+                } else {
+                    // All tiles complete — generate mipmaps for high-quality zoom-out rendering
+                    viewGl.bindTexture(viewGl.TEXTURE_2D, restoredTex);
+                    viewGl.generateMipmap(viewGl.TEXTURE_2D);
+                    viewGl.texParameteri(viewGl.TEXTURE_2D, viewGl.TEXTURE_MIN_FILTER, viewGl.LINEAR_MIPMAP_LINEAR);
+                    // Complete
+                    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+                    log(`Super-Resolution Inference complete in ${duration}s!`, "success");
+                    
+                    loaderOverlay.classList.remove('active');
+                    document.getElementById('btnRestore').removeAttribute('disabled');
+                    document.getElementById('btnDownload').removeAttribute('disabled');
+                    document.getElementById('statusDot').className = 'status-dot';
+                    document.getElementById('statusText').textContent = 'GPU Engine Idle';
+                    state.isRestoring = false;
+                }
+            };
+            
+            requestAnimationFrame(processNextBatch);
+        }
+
+        // WebGL Pipeline runner for a single tile
+        function executeWebGLPipeline(gl, inputPatchCanvas, wUpscaled, hUpscaled, wOut, hOut, dxOut, dyOut, internalFmt, floatType) {
+            
+            // WebGL quad buffer setups
+            const posAttrLoc = 0;
+            const texAttrLoc = 1;
+            
+            // Helper to allocate texture
+            const createTileTexture = (w, h, internalFormat, type, data = null) => {
+                const tex = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, tex);
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, w, h, 0, gl.RGBA, type, data);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                return tex;
+            };
+
+            // Helper to allocate Framebuffer
+            const createTileFbo = (tex) => {
+                const fbo = gl.createFramebuffer();
+                gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+                return fbo;
+            };
+            
+            // Upload Input Low-Res patch (normal 8-bit texture)
+            const texIn = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texIn);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, inputPatchCanvas);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            
+            // Allocate pipeline intermediate textures
+            // Pass 1a: Low-res Denoise
+            const texDenoisedLR = createTileTexture(inputPatchCanvas.width, inputPatchCanvas.height, internalFmt, floatType);
+            const fboDenoisedLR = createTileFbo(texDenoisedLR);
+            
+            // Pass 1b: Upscaled base YCbCr
+            const texUpscaled = createTileTexture(wUpscaled, hUpscaled, internalFmt, floatType);
+            const fboUpscaled = createTileFbo(texUpscaled);
+            
+            // Pass 2: SRCNN Layer 1 features (RGBA)
+            const texL1 = createTileTexture(wUpscaled, hUpscaled, internalFmt, floatType);
+            const fboL1 = createTileFbo(texL1);
+            
+            // Pass 3: SRCNN Layer 2 features (RGBA)
+            const texL2 = createTileTexture(wUpscaled, hUpscaled, internalFmt, floatType);
+            const fboL2 = createTileFbo(texL2);
+            
+            // Pass 4: SRCNN Layer 3 reconstructed YCbCr (RGBA)
+            const texL3 = createTileTexture(wUpscaled, hUpscaled, internalFmt, floatType);
+            const fboL3 = createTileFbo(texL3);
+            
+            // Pass 5: Output RGB cropped
+            const texOut = createTileTexture(wOut, hOut, gl.RGBA, gl.UNSIGNED_BYTE);
+            const fboOut = createTileFbo(texOut);
+            
+            // Bind shared quad and set attribute layout once per tile
+            gl.bindBuffer(gl.ARRAY_BUFFER, state.procQuadBuffer);
+            gl.vertexAttribPointer(posAttrLoc, 2, gl.FLOAT, false, 16, 0);
+            gl.enableVertexAttribArray(posAttrLoc);
+            gl.vertexAttribPointer(texAttrLoc, 2, gl.FLOAT, false, 16, 8);
+            gl.enableVertexAttribArray(texAttrLoc);
+
+            // -------------------------------------------------------
+            // PASS 1a: Bilateral Denoise at low-res
+            // viewport = full patch; v_texCoord = 0..1 over patch
+            // -------------------------------------------------------
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fboDenoisedLR);
+            gl.viewport(0, 0, inputPatchCanvas.width, inputPatchCanvas.height);
+            let prog = state.procPrograms.denoise;
+            gl.useProgram(prog);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texIn);
+            gl.uniform1i(gl.getUniformLocation(prog, 'u_texture'), 0);
+            gl.uniform2f(gl.getUniformLocation(prog, 'u_texelSize'),
+                1.0 / inputPatchCanvas.width, 1.0 / inputPatchCanvas.height);
+            gl.uniform1f(gl.getUniformLocation(prog, 'u_denoiseStrength'), state.denoiseStrength);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // -------------------------------------------------------
+            // PASS 1b: Bicubic upsample to padded high-res tile
+            // viewport = wUpscaled x hUpscaled; sample 0..1 of denoised LR
+            // -------------------------------------------------------
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fboUpscaled);
+            gl.viewport(0, 0, wUpscaled, hUpscaled);
+            prog = state.procPrograms.bicubic;
+            gl.useProgram(prog);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texDenoisedLR);
+            gl.uniform1i(gl.getUniformLocation(prog, 'u_texture'), 0);
+            // texelSize is in low-res space so bicubic can do accurate grid addressing
+            gl.uniform2f(gl.getUniformLocation(prog, 'u_texelSize'),
+                1.0 / inputPatchCanvas.width, 1.0 / inputPatchCanvas.height);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // -------------------------------------------------------
+            // PASS 2: SRCNN Layer 1 — Feature Extraction
+            // viewport = wUpscaled x hUpscaled; sample from upscaled YCbCr
+            // -------------------------------------------------------
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fboL1);
+            gl.viewport(0, 0, wUpscaled, hUpscaled);
+            prog = state.procPrograms.layer1;
+            gl.useProgram(prog);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texUpscaled);
+            gl.uniform1i(gl.getUniformLocation(prog, 'u_texture'), 0);
+            gl.uniform2f(gl.getUniformLocation(prog, 'u_texelSize'), 1.0 / wUpscaled, 1.0 / hUpscaled);
+            gl.uniform4fv(gl.getUniformLocation(prog, 'u_kernel1'), state.weights.layer1);
+            gl.uniform4fv(gl.getUniformLocation(prog, 'u_bias1'), state.weights.bias1);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // -------------------------------------------------------
+            // PASS 3: SRCNN Layer 2 — Non-Linear Mapping
+            // -------------------------------------------------------
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fboL2);
+            gl.viewport(0, 0, wUpscaled, hUpscaled);
+            prog = state.procPrograms.layer2;
+            gl.useProgram(prog);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texL1);
+            gl.uniform1i(gl.getUniformLocation(prog, 'u_texture'), 0);
+            gl.uniform2f(gl.getUniformLocation(prog, 'u_texelSize'), 1.0 / wUpscaled, 1.0 / hUpscaled);
+            gl.uniformMatrix4fv(gl.getUniformLocation(prog, 'u_kernel2'), false, state.weights.layer2);
+            gl.uniform4fv(gl.getUniformLocation(prog, 'u_bias2'), state.weights.bias2);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // -------------------------------------------------------
+            // PASS 4: SRCNN Layer 3 — Reconstruction
+            // -------------------------------------------------------
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fboL3);
+            gl.viewport(0, 0, wUpscaled, hUpscaled);
+            prog = state.procPrograms.layer3;
+            gl.useProgram(prog);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texL2);
+            gl.uniform1i(gl.getUniformLocation(prog, 'u_texture_features'), 0);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, texUpscaled);
+            gl.uniform1i(gl.getUniformLocation(prog, 'u_texture_base'), 1);
+            gl.uniform2f(gl.getUniformLocation(prog, 'u_texelSize'), 1.0 / wUpscaled, 1.0 / hUpscaled);
+            gl.uniform4fv(gl.getUniformLocation(prog, 'u_kernel3'), state.weights.layer3);
+            gl.uniform1f(gl.getUniformLocation(prog, 'u_bias3'), state.weights.bias3);
+            gl.uniform1f(gl.getUniformLocation(prog, 'u_detailStrength'), state.detailStrength);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // -------------------------------------------------------
+            // PASS 5: Crop padding + Adaptive Sharpen + YCbCr→RGB
+            //
+            // viewport = wOut x hOut (the final unpadded tile size)
+            // gl_FragCoord.xy ∈ [0..wOut) × [0..hOut)
+            // u_cropOffset = (dxOut, dyOut): offset in pixels inside the padded tile
+            // u_paddedSize = (wUpscaled, hUpscaled)
+            // The shader computes: uv = (gl_FragCoord.xy + u_cropOffset) / u_paddedSize
+            // -------------------------------------------------------
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fboOut);
+            gl.viewport(0, 0, wOut, hOut);
+            prog = state.procPrograms.sharpen;
+            gl.useProgram(prog);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texL3);
+            gl.uniform1i(gl.getUniformLocation(prog, 'u_texture'), 0);
+            gl.uniform2f(gl.getUniformLocation(prog, 'u_texelSize'), 1.0 / wUpscaled, 1.0 / hUpscaled);
+            gl.uniform1f(gl.getUniformLocation(prog, 'u_sharpenStrength'), state.sharpenStrength);
+            // Crop offset: skip the padding border (dxOut, dyOut pixels from bottom-left of padded tile)
+            gl.uniform2f(gl.getUniformLocation(prog, 'u_cropOffset'), dxOut, dyOut);
+            gl.uniform2f(gl.getUniformLocation(prog, 'u_paddedSize'), wUpscaled, hUpscaled);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // Synchronize GPU before readback
+            gl.flush();
+            gl.finish();
+
+            // Read pixels — WebGL FBOs are bottom-up, so row 0 = bottom of tile.
+            // We flip rows here in JS so the resulting Uint8Array is top-down
+            // (matching what putImageData / texSubImage2D expect).
+            const rawPixels = new Uint8Array(wOut * hOut * 4);
+            gl.readPixels(0, 0, wOut, hOut, gl.RGBA, gl.UNSIGNED_BYTE, rawPixels);
+
+            const pixels = new Uint8Array(wOut * hOut * 4);
+            const rowBytes = wOut * 4;
+            for (let row = 0; row < hOut; row++) {
+                const srcRow = hOut - 1 - row;  // bottom-up → top-down
+                pixels.set(
+                    rawPixels.subarray(srcRow * rowBytes, srcRow * rowBytes + rowBytes),
+                    row * rowBytes
+                );
+            }
+
+            // Release all GPU resources allocated for this tile
+            gl.deleteTexture(texIn);
+            gl.deleteTexture(texDenoisedLR);
+            gl.deleteTexture(texUpscaled);
+            gl.deleteTexture(texL1);
+            gl.deleteTexture(texL2);
+            gl.deleteTexture(texL3);
+            gl.deleteTexture(texOut);
+            gl.deleteFramebuffer(fboDenoisedLR);
+            gl.deleteFramebuffer(fboUpscaled);
+            gl.deleteFramebuffer(fboL1);
+            gl.deleteFramebuffer(fboL2);
+            gl.deleteFramebuffer(fboL3);
+            gl.deleteFramebuffer(fboOut);
+
+            return pixels;
+        }
+
+        // Export Restored canvas to file
+        function exportRestoredImage() {
+            if (!state.restoredCanvas) return;
+            log("Generating export binary...", "sys");
+            state.restoredCanvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `restored_${state.targetPreset}_${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                log("Image downloaded successfully.", "success");
+            }, 'image/png', 1.0);
+        }
+
+        // Helper to map string to GL enum to avoid compilation issues in strict ES modules
+        function glEnum(name) {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl2');
+            return gl ? gl[name] : 0;
+        }
+
+        // ----------------------------------------------------
+        // Neural Weights Tuner Core Functionality
+        // ----------------------------------------------------
+        function populateTunerUI() {
+            const grid = document.getElementById('tunerKernelGrid');
+            grid.innerHTML = '';
+            
+            const isL2 = state.tunerSelectedLayer.startsWith('layer2');
+            document.getElementById('layer2TunerSection').style.display = isL2 ? 'block' : 'block'; // Keep visible or hide depending
+            
+            if (state.tunerSelectedLayer.startsWith('layer1')) {
+                // Layer 1 is 5x5, 4 filters
+                grid.className = 'kernel-grid kernel-grid-5';
+                const filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+                
+                for (let i = 0; i < 25; i++) {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.className = 'kernel-input';
+                    input.step = '0.05';
+                    input.value = state.weights.layer1[i*4 + filterIdx].toFixed(2);
+                    input.dataset.index = i;
+                    input.dataset.type = 'l1';
+                    input.addEventListener('change', handleWeightChange);
+                    grid.appendChild(input);
+                }
+            } else if (state.tunerSelectedLayer.startsWith('layer3')) {
+                // Layer 3 is 5x5, 4 input feature weights
+                grid.className = 'kernel-grid kernel-grid-5';
+                const filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+                
+                for (let i = 0; i < 25; i++) {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.className = 'kernel-input';
+                    input.step = '0.05';
+                    input.value = state.weights.layer3[i*4 + filterIdx].toFixed(2);
+                    input.dataset.index = i;
+                    input.dataset.type = 'l3';
+                    input.addEventListener('change', handleWeightChange);
+                    grid.appendChild(input);
+                }
+            }
+            
+            // Build Layer 2 matrix visualizer
+            const l2Grid = document.getElementById('tunerLayer2Grid');
+            l2Grid.innerHTML = '';
+            // Display the center (0,0) matrix mixing of Layer 2
+            const l2CenterIdx = 4 * 16; // Center element in 3x3 of mat4
+            for (let i = 0; i < 16; i++) {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'kernel-input';
+                input.step = '0.1';
+                input.value = state.weights.layer2[l2CenterIdx + i].toFixed(2);
+                input.dataset.index = i;
+                input.dataset.type = 'l2';
+                input.addEventListener('change', handleWeightChange);
+                l2Grid.appendChild(input);
+            }
+            
+            drawTunerHeatmap();
+        }
+
+        function handleWeightChange(e) {
+            const val = parseFloat(e.target.value) || 0.0;
+            const idx = parseInt(e.target.dataset.index);
+            const type = e.target.dataset.type;
+            
+            if (type === 'l1') {
+                const filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+                state.weights.layer1[idx * 4 + filterIdx] = val;
+            } else if (type === 'l3') {
+                const filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+                state.weights.layer3[idx * 4 + filterIdx] = val;
+            } else if (type === 'l2') {
+                const l2CenterIdx = 4 * 16;
+                state.weights.layer2[l2CenterIdx + idx] = val;
+            }
+            
+            drawTunerHeatmap();
+            log("Neural weight configuration updated.", "sys");
+        }
+
+        function drawTunerHeatmap() {
+            const canvas = document.getElementById('tunerHeatmap');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0,0,80,80);
+            
+            let size = 5;
+            let vals = [];
+            
+            if (state.tunerSelectedLayer.startsWith('layer1')) {
+                const filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+                for (let i = 0; i < 25; i++) {
+                    vals.push(state.weights.layer1[i * 4 + filterIdx]);
+                }
+            } else if (state.tunerSelectedLayer.startsWith('layer3')) {
+                const filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+                for (let i = 0; i < 25; i++) {
+                    vals.push(state.weights.layer3[i * 4 + filterIdx]);
+                }
+            } else {
+                size = 4;
+                const l2CenterIdx = 4 * 16;
+                for (let i = 0; i < 16; i++) {
+                    vals.push(state.weights.layer2[l2CenterIdx + i]);
+                }
+            }
+            
+            // Find absolute max to normalize colors
+            const maxVal = Math.max(...vals.map(Math.abs)) || 1.0;
+            const cellSize = 80 / size;
+            
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const val = vals[y * size + x];
+                    const norm = val / maxVal; // -1 to 1
+                    
+                    let r = 0, g = 0, b = 0;
+                    if (norm > 0) {
+                        // Cyan gradient for positive weights
+                        g = Math.round(norm * 200);
+                        b = Math.round(norm * 255);
+                    } else {
+                        // Orange gradient for negative weights
+                        r = Math.round(-norm * 255);
+                        g = Math.round(-norm * 100);
+                    }
+                    
+                    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize - 1, cellSize - 1);
+                }
+            }
+        }
+
+        function resetSelectedLayerWeights() {
+            // Re-generate default configuration
+            const defaults = generateDefaultWeights();
+            
+            if (state.tunerSelectedLayer.startsWith('layer1')) {
+                const filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+                for (let i = 0; i < 25; i++) {
+                    state.weights.layer1[i*4 + filterIdx] = defaults.layer1[i*4 + filterIdx];
+                }
+            } else if (state.tunerSelectedLayer.startsWith('layer3')) {
+                const filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+                for (let i = 0; i < 25; i++) {
+                    state.weights.layer3[i*4 + filterIdx] = defaults.layer3[i*4 + filterIdx];
+                }
+            } else {
+                const l2CenterIdx = 4 * 16;
+                for (let i = 0; i < 16; i++) {
+                    state.weights.layer2[l2CenterIdx + i] = defaults.layer2[l2CenterIdx + i];
+                }
+            }
+            
+            populateTunerUI();
+            log("Layer weights reset to default configurations.", "warning");
+        }
+
+        function normalizeSelectedLayerWeights() {
+            let size = 5;
+            let weightsArr = null;
+            let filterIdx = 0;
+            
+            if (state.tunerSelectedLayer.startsWith('layer1')) {
+                weightsArr = state.weights.layer1;
+                filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+            } else if (state.tunerSelectedLayer.startsWith('layer3')) {
+                weightsArr = state.weights.layer3;
+                filterIdx = parseInt(state.tunerSelectedLayer.split('_f')[1]);
+            } else {
+                return; // Layer 2 matrix doesn't need scaling normalization
+            }
+            
+            let absSum = 0;
+            for (let i = 0; i < 25; i++) {
+                absSum += Math.abs(weightsArr[i*4 + filterIdx]);
+            }
+            
+            if (absSum > 0) {
+                for (let i = 0; i < 25; i++) {
+                    weightsArr[i*4 + filterIdx] /= absSum;
+                }
+            }
+            
+            populateTunerUI();
+            log("Layer weights normalized successfully.", "success");
+        }
+    </script>
+</body>
+</html>
